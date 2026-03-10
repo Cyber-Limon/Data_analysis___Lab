@@ -1,8 +1,13 @@
 import csv
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
+from scipy import stats
+from statsmodels.stats.descriptivestats import ds
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+
 
 
 
@@ -35,11 +40,11 @@ print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 1 =====")
 
 print("\n\n\n--- Задание 1 / Анализ графика исходного ряда ---")
 
-plt.plot(time, values)
+"""plt.plot(time, values)
 plt.title("Погода в Стерлитамаке за 2021-2025 годы", fontweight='bold')
 plt.xlabel("Дата")
 plt.ylabel("Температура")
-plt.show()
+plt.show()"""
 
 
 
@@ -53,7 +58,7 @@ second_difference = []
 for i in range(len(first_difference) - 1):
     second_difference.append(first_difference[i + 1] - first_difference[i])
 
-plot_acf(values,             lags=12)
+"""plot_acf(values,             lags=12)
 plt.show()
 
 plot_acf(first_difference,   lags=12)
@@ -69,7 +74,7 @@ plot_pacf(first_difference,  lags=12)
 plt.show()
 
 plot_pacf(second_difference, lags=12)
-plt.show()
+plt.show()"""
 
 
 
@@ -129,7 +134,6 @@ for test, regression in zip(tests, regressions):
     result.append(True)
 
 
-
 print("Результаты тестов:")
 for i in range(len(result)):
     if result[i]:
@@ -161,6 +165,44 @@ print("\nТип процесса: " + res)
 print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 2 =====")
 
 
+
+print("\n\n\n--- Задание 1 / Проведение теста Кванда-Эндрюса ---")
+t = [i for i in range(1, len(values) + 1)]
+X = sm.add_constant(t)
+
+start = int(len(values) * 0.15)
+end   = int(len(values) * 0.85)
+k     = X.shape[1]
+
+f_statistics = []
+for i in range(start, end):
+    x1, y1 = X[:i], values[:i]
+    x2, y2 = X[i:], values[i:]
+
+    S  = sm.OLS(values, X).fit().ssr
+    S1 = sm.OLS(y1, x1).fit().ssr
+    S2 = sm.OLS(y2, x2).fit().ssr
+
+    f_statistics.append(((S - (S1 + S2)) / k) / ((S1 + S2) / (len(values) - 2 * k)))
+
+breakpoint_index = start + f_statistics.index(max(f_statistics))
+p_value = 1 - stats.f.cdf(max(f_statistics), k, len(values) - 2 * k)
+print(f"Точка излома - {time[breakpoint_index]} (p-value: {p_value})")
+
+
+
+print("\n\n\n--- Задание 2 / Ввод фиктивных переменных ---")
+
+ds  = [0] * breakpoint_index + [1] + [0] * (len(values) - breakpoint_index - 1)
+ds1 = [0] * breakpoint_index + [1] * (len(values) - breakpoint_index)
+dt  = [0] * breakpoint_index + [i for i in range(1, (len(values) - breakpoint_index) + 1)]
+
+
+
+print("\n\n\n--- Задание 3 / x ---")
+print("\n\n\n--- Задание 4 / x ---")
+print("\n\n\n--- Задание 5 / x ---")
+print("\n\n\n--- Задание 6 / x ---")
 
 
 
