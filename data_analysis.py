@@ -8,8 +8,8 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 print("\n\n\n--- Импорт временного ряда ---")
 
-weather_time = []
-weather_value = []
+time   = []
+values = []
 
 with open('weather.csv', mode='r', encoding='utf-8') as file:
     dict_reader = csv.DictReader(file)
@@ -17,13 +17,13 @@ with open('weather.csv', mode='r', encoding='utf-8') as file:
         r = row["# Метеостанция Стерлитамак"]
 
         if "14:00" in r:
-            weather_time.append(r[0:10])
+            time.append(r[0:10])
 
             end = r.index(";", 18)
-            weather_value.append(float(r[18:end - 1]))
+            values.append(float(r[18:end - 1]))
 
-weather_time.reverse()
-weather_value.reverse()
+time.reverse()
+values.reverse()
 
 
 
@@ -35,7 +35,7 @@ print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 1 =====")
 
 print("\n\n\n--- Задание 1 / Анализ графика исходного ряда ---")
 
-plt.plot(weather_time, weather_value)
+plt.plot(time, values)
 plt.title("Погода в Стерлитамаке за 2021-2025 годы", fontweight='bold')
 plt.xlabel("Дата")
 plt.ylabel("Температура")
@@ -46,14 +46,14 @@ plt.show()
 print("\n\n\n--- Задание 2 / Анализ коррелограмм ---")
 
 first_difference = []
-for i in range(len(weather_value) - 1):
-    first_difference.append(weather_value[i + 1] - weather_value[i])
+for i in range(len(values) - 1):
+    first_difference.append(values[i + 1] - values[i])
 
 second_difference = []
 for i in range(len(first_difference) - 1):
     second_difference.append(first_difference[i + 1] - first_difference[i])
 
-plot_acf(weather_value,      lags=12)
+plot_acf(values,             lags=12)
 plt.show()
 
 plot_acf(first_difference,   lags=12)
@@ -62,7 +62,7 @@ plt.show()
 plot_acf(second_difference,  lags=12)
 plt.show()
 
-plot_pacf(weather_value,     lags=12)
+plot_pacf(values,            lags=12)
 plt.show()
 
 plot_pacf(first_difference,  lags=12)
@@ -76,13 +76,13 @@ plt.show()
 print("\n\n\n--- Задание 3 / Проведение тестов Дики-Фуллера ---")
 
 test_1          = adfuller(first_difference,  regression='ct', regresults=True)
-test_2          = adfuller(weather_value,     regression='ct', regresults=True)
+test_2          = adfuller(values,            regression='ct', regresults=True)
 test_3          = adfuller(second_difference, regression='n',  regresults=True)
 extended_test_3 = adfuller(second_difference, regression='c',  regresults=True)
 test_4          = adfuller(first_difference,  regression='n',  regresults=True)
 extended_test_4 = adfuller(first_difference,  regression='c',  regresults=True)
-test_5          = adfuller(weather_value,     regression='n',  regresults=True)
-extended_test_5 = adfuller(weather_value,     regression='c',  regresults=True)
+test_5          = adfuller(values,            regression='n',  regresults=True)
+extended_test_5 = adfuller(values,            regression='c',  regresults=True)
 
 tests       = [test_1, test_2, test_3, extended_test_3, test_4, extended_test_4, test_5, extended_test_5]
 regressions = ["ct", "ct", "n", "c", "n", "c", "n", "c"]
@@ -159,6 +159,11 @@ print("\nТип процесса: " + res)
 
 
 print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 2 =====")
+
+
+
+
+
 print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 3 =====")
 print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 4 =====")
 print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 5 =====")
