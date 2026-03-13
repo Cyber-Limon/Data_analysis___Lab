@@ -1,8 +1,8 @@
 import csv
+import numpy as np
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from scipy import stats
-from statsmodels.stats.descriptivestats import ds
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
@@ -40,54 +40,52 @@ print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 1 =====")
 
 print("\n\n\n--- Задание 1 / Анализ графика исходного ряда ---")
 
-"""plt.plot(time, values)
+plt.plot(time, values)
 plt.title("Погода в Стерлитамаке за 2021-2025 годы", fontweight='bold')
 plt.xlabel("Дата")
 plt.ylabel("Температура")
-plt.show()"""
+plt.show()
 
 
 
 print("\n\n\n--- Задание 2 / Анализ коррелограмм ---")
 
-first_difference = []
-for i in range(len(values) - 1):
-    first_difference.append(values[i + 1] - values[i])
+values_first_difference  = np.diff(values)
+values_second_difference = np.diff(values, 2)
+values_third_difference  = np.diff(values, 3)
 
-second_difference = []
-for i in range(len(first_difference) - 1):
-    second_difference.append(first_difference[i + 1] - first_difference[i])
 
-"""plot_acf(values,             lags=12)
+
+plot_acf(values,                    lags=12)
 plt.show()
 
-plot_acf(first_difference,   lags=12)
+plot_acf(values_first_difference,   lags=12)
 plt.show()
 
-plot_acf(second_difference,  lags=12)
+plot_acf(values_second_difference,  lags=12)
 plt.show()
 
-plot_pacf(values,            lags=12)
+plot_pacf(values,                   lags=12)
 plt.show()
 
-plot_pacf(first_difference,  lags=12)
+plot_pacf(values_first_difference,  lags=12)
 plt.show()
 
-plot_pacf(second_difference, lags=12)
-plt.show()"""
+plot_pacf(values_second_difference, lags=12)
+plt.show()
 
 
 
 print("\n\n\n--- Задание 3 / Проведение тестов Дики-Фуллера ---")
 
-test_1          = adfuller(first_difference,  regression='ct', regresults=True)
-test_2          = adfuller(values,            regression='ct', regresults=True)
-test_3          = adfuller(second_difference, regression='n',  regresults=True)
-extended_test_3 = adfuller(second_difference, regression='c',  regresults=True)
-test_4          = adfuller(first_difference,  regression='n',  regresults=True)
-extended_test_4 = adfuller(first_difference,  regression='c',  regresults=True)
-test_5          = adfuller(values,            regression='n',  regresults=True)
-extended_test_5 = adfuller(values,            regression='c',  regresults=True)
+test_1          = adfuller(values_first_difference,  regression='ct', regresults=True)
+test_2          = adfuller(values,                   regression='ct', regresults=True)
+test_3          = adfuller(values_second_difference, regression='n',  regresults=True)
+extended_test_3 = adfuller(values_second_difference, regression='c',  regresults=True)
+test_4          = adfuller(values_first_difference,  regression='n',  regresults=True)
+extended_test_4 = adfuller(values_first_difference,  regression='c',  regresults=True)
+test_5          = adfuller(values,                   regression='n',  regresults=True)
+extended_test_5 = adfuller(values,                   regression='c',  regresults=True)
 
 tests       = [test_1, test_2, test_3, extended_test_3, test_4, extended_test_4, test_5, extended_test_5]
 regressions = ["ct", "ct", "n", "c", "n", "c", "n", "c"]
@@ -199,10 +197,85 @@ dt  = [0] * breakpoint_index + [i for i in range(1, (len(values) - breakpoint_in
 
 
 
-print("\n\n\n--- Задание 3 / x ---")
-print("\n\n\n--- Задание 4 / x ---")
-print("\n\n\n--- Задание 5 / x ---")
-print("\n\n\n--- Задание 6 / x ---")
+print("\n\n\n--- Задание 3 / Построение моделей ---")
+
+def building_models(values, *variables: list):
+    X     = sm.add_constant(np.column_stack(variables))
+    model = sm.OLS(values, X).fit()
+    return model
+
+
+
+ds_first_difference   = ds[:-1]
+ds_second_difference  = ds[:-2]
+ds_third_difference   = ds[:-3]
+
+ds1_first_difference  = ds1[:-1]
+ds1_second_difference = ds1[:-2]
+ds1_third_difference  = ds1[:-3]
+
+values_for_first_difference  = values[:-1]
+
+values_first_difference_for_second_difference = values_first_difference[:-1]
+values_second_difference_for_third_difference = values_second_difference[:-1]
+
+
+
+if res == "TS + DS" or res == "TS":
+    model_1 = building_models(values, t, dt)
+    model_2 = building_models(values, t, ds1)
+    model_3 = building_models(values, t, dt, ds1)
+
+if res == "DS I(0)":
+    model_1 = building_models(values_first_difference, values_for_first_difference, ds_first_difference)
+    model_2 = building_models(values_first_difference, values_for_first_difference, ds1_first_difference)
+    model_3 = building_models(values_first_difference, values_for_first_difference, ds_first_difference, ds1_first_difference)
+
+if res == "DS I(1)":
+    model_1 = building_models(values_second_difference, values_first_difference_for_second_difference, ds_second_difference)
+    model_2 = building_models(values_second_difference, values_first_difference_for_second_difference, ds1_second_difference)
+    model_3 = building_models(values_second_difference, values_first_difference_for_second_difference, ds_second_difference, ds1_second_difference)
+
+if res == "DS I(2)":
+    model_1 = building_models(values_third_difference, values_second_difference_for_third_difference, ds_third_difference)
+    model_2 = building_models(values_third_difference, values_second_difference_for_third_difference, ds1_third_difference)
+    model_3 = building_models(values_third_difference, values_second_difference_for_third_difference, ds_third_difference, ds1_third_difference)
+
+
+
+print("\n\n\n--- Задание 4 / Проверка статистической значимости ---")
+
+def significance_test(model):
+    if model.f_pvalue >= 0.05:
+        return False
+
+    for i in model.pvalues[1:]:
+        if i >= 0.05:
+            return False
+
+    if not(1.6 < durbin_watson(model.resid) < 2.4):
+        return False
+
+    return True
+
+
+
+print("\n\n\n--- Задание 5 / Оценка качества ---")
+
+model_1 = significance_test(model_1)
+model_2 = significance_test(model_2)
+model_3 = significance_test(model_3)
+
+
+
+print("\n\n\n--- Задание 6 / Определение типа процесса c учетом структурных изменений ---")
+
+if model_1 or model_2 or model_3:
+    print(res + " со структурным скачком")
+else:
+    print(res + " без структурного скачка")
+
+
 
 
 
