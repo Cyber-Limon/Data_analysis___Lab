@@ -34,17 +34,17 @@ values.reverse()
 
 
 
-print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 1 =====")
+print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 1 / Определение типа процесса =====")
 
 
 
 print("\n\n\n--- Задание 1 / Анализ графика исходного ряда ---")
 
-plt.plot(time, values)
-plt.title("Погода в Стерлитамаке за 2021-2025 годы", fontweight='bold')
-plt.xlabel("Дата")
-plt.ylabel("Температура")
-plt.show()
+# plt.plot(time, values)
+# plt.title("Погода в Стерлитамаке за 2021-2025 годы", fontweight='bold')
+# plt.xlabel("Дата")
+# plt.ylabel("Температура")
+# plt.show()
 
 
 
@@ -56,23 +56,23 @@ values_third_difference  = np.diff(values, 3)
 
 
 
-plot_acf(values,                    lags=12)
-plt.show()
-
-plot_acf(values_first_difference,   lags=12)
-plt.show()
-
-plot_acf(values_second_difference,  lags=12)
-plt.show()
-
-plot_pacf(values,                   lags=12)
-plt.show()
-
-plot_pacf(values_first_difference,  lags=12)
-plt.show()
-
-plot_pacf(values_second_difference, lags=12)
-plt.show()
+# plot_acf(values,                    lags=12)
+# plt.show()
+#
+# plot_acf(values_first_difference,   lags=12)
+# plt.show()
+#
+# plot_acf(values_second_difference,  lags=12)
+# plt.show()
+#
+# plot_pacf(values,                   lags=12)
+# plt.show()
+#
+# plot_pacf(values_first_difference,  lags=12)
+# plt.show()
+#
+# plot_pacf(values_second_difference, lags=12)
+# plt.show()
 
 
 
@@ -160,7 +160,7 @@ print("\nТип процесса: " + res)
 
 
 
-print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 2 =====")
+print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 2 / Структурные изменения =====")
 
 
 
@@ -214,7 +214,7 @@ ds1_first_difference  = ds1[:-1]
 ds1_second_difference = ds1[:-2]
 ds1_third_difference  = ds1[:-3]
 
-values_for_first_difference  = values[:-1]
+values_for_first_difference = values[:-1]
 
 values_first_difference_for_second_difference = values_first_difference[:-1]
 values_second_difference_for_third_difference = values_second_difference[:-1]
@@ -246,13 +246,16 @@ if res == "DS I(2)":
 print("\n\n\n--- Задание 4 / Проверка статистической значимости ---")
 
 def significance_test(model):
+    # F-statistic
     if model.f_pvalue >= 0.05:
         return False
 
+    # p-value
     for i in model.pvalues[1:]:
         if i >= 0.05:
             return False
 
+    # Durbin-Watson statistic
     if not(1.6 < durbin_watson(model.resid) < 2.4):
         return False
 
@@ -279,7 +282,120 @@ else:
 
 
 
-print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 3 =====")
+print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 3 / Выделение детерминированных компонент из структуры ряда =====")
+
+
+
+print("\n\n\n--- Задание 1 / Анализ графика исходного ряда ---")
+
+# plt.plot(time, values)
+# plt.title("Погода в Стерлитамаке за 2021-2025 годы", fontweight='bold')
+# plt.xlabel("Дата")
+# plt.ylabel("Температура")
+# plt.show()
+
+
+
+print("\n\n\n--- Задание 2 / Анализ коррелограмм ---")
+
+def acf_pacf(values):
+    # plot_acf(values,  lags=(len(values) // 2))
+    # plt.show()
+    #
+    # plot_pacf(values, lags=(len(values) // 2))
+    # plt.show()
+    pass
+
+
+
+if res == "DS I(0)":
+    current_values = values.copy()
+
+if res == "DS I(1)":
+    current_values = values_first_difference.copy()
+
+if res == "DS I(2)":
+    current_values = values_second_difference.copy()
+
+if res == "TS + DS" or res == "TS":
+    model_type = 0
+    while model_type != "1" and model_type != "2":
+        print("\nУкажите тип модели"
+              "\nВведите '1' - если аддитивная"
+              "\nВведите '2' - если мультипликативная")
+        model_type = input("Ввод        - ")
+
+    if model_type == "1":
+        leftovers = sm.OLS(values, X).fit().resid
+    else:
+        leftovers = sm.OLS(np.log([(i + 1 + min(values) * (-1)) for i in values]), X).fit().resid
+
+    if res == "TS":
+        current_values = leftovers
+    else:
+        current_values = np.diff(leftovers)
+
+acf_pacf(current_values)
+
+
+
+print("\n\n\n--- Задание 3 / Выделение сезонности ---")
+
+# Первый способ: оценка сезонности с помощью тригонометрических функций
+
+def first_method(values):
+    best   = None
+    best_n = 0
+
+    for n in range(2, 10, 2):
+        t = np.arange(1, len(values) + 1)
+
+        sin_t = np.sin(n * np.pi * t / T)
+        cos_t = np.cos(n * np.pi * t / T)
+
+        model = sm.OLS(values, sm.add_constant(np.column_stack((sin_t, cos_t)))).fit()
+
+        if best is None or (1.0 - model.rsquared) < best.rsquared:
+            best    = model
+            best_n = n
+
+    print(f"\nИндекс детерминации: {best.rsquared} (достигается при {best_n} * pi)")
+    acf_pacf(best.resid)
+
+
+
+    plt.plot(time[:len(values)], values)
+    plt.plot(time[:len(values)], np.subtract(values, best.resid))
+    plt.plot(time[:len(values)], best.resid)
+    plt.show()
+
+
+
+T = int(input("Введите период сезонности: "))
+
+first_method(current_values)
+
+
+
+# Второй способ: оценка методом сезонных поправок (индексов)
+
+
+
+# Третий способ: оценка методом введения фиктивных переменных
+
+
+
+# Четвертый способ:
+
+
+
+print("\n\n\n--- Задание 4 / Удаление детерминированного тренда ---")
+print("\n\n\n--- Задание 5 / x ---")
+
+
+
+
+
 print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 4 =====")
 print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 5 =====")
 print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 6 =====")
