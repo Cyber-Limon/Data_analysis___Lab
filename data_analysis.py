@@ -3,13 +3,14 @@ import numpy             as np
 import pandas            as pd
 import statsmodels.api   as sm
 import matplotlib.pyplot as plt
+from arch                          import arch_model
 from scipy                         import stats
 from scipy.stats                   import jarque_bera
 from statsmodels.tsa.seasonal      import STL
 from statsmodels.tsa.stattools     import adfuller
 from statsmodels.tsa.arima.model   import ARIMA
 from statsmodels.stats.stattools   import durbin_watson
-from statsmodels.stats.diagnostic  import acorr_ljungbox
+from statsmodels.stats.diagnostic  import acorr_ljungbox, het_arch
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 
@@ -58,7 +59,7 @@ original_schedule()
 
 print("\n\n\n--- Задание 2 / Анализ коррелограмм ---")
 
-def acf_pacf(values, lags = None):
+def acf_pacf(values, lags=None):
     if lags is None:
         lags = len(values) // 2
 
@@ -314,7 +315,7 @@ if res == "TS + DS" or res == "TS":
 
 
 
-    print("\n\n\n--- Задание 4 / Удаление детерминированного тренда ---")
+    print("\n\n\n--- Задание 3 / Удаление детерминированного тренда ---")
 
     degrees = [t, np.pow(t, 2), np.pow(t, 3)]
 
@@ -326,12 +327,12 @@ if res == "TS + DS" or res == "TS":
 
 
 
-    print("\n\n\n--- Задание 5 / Определение вида детерминированных компонент ---")
+    print("\n\n\n--- Задание 4 / Определение вида детерминированных компонент ---")
 
     result = []
 
-    for residual in residuals:
-        test = adfuller(residual, regression="c", regresults=True)
+    for i in residuals:
+        test = adfuller(i, regression="c", regresults=True)
 
         if test[0] > test[2]["1%"]:
             result.append(False)
@@ -371,7 +372,7 @@ acf_pacf(current_values)
 
 
 
-print("\n\n\n--- Задание 3 / Выделение сезонности ---")
+print("\n\n\n--- Задание 5 / Выделение сезонности ---")
 
 def plot(values, residuals):
     plt.plot(time[:len(values)], values,                         "k", label="Исходный", linewidth=0.5)
@@ -438,7 +439,6 @@ second_method(current_values)
 
 
 # Третий способ: оценка методом введения фиктивных переменных
-
 def third_method(values):
     D = []
 
@@ -538,13 +538,13 @@ if res == "TS + DS":
 print("\n\n\n--- Задание 2 / Идентификация модели ---")
 
 if res == "DS I(0)":
-    acf_pacf(values, T)
+    acf_pacf(values, 12)
 
 if res == "DS I(1)" or res == "TS":
-    acf_pacf(values_first_difference, T)
+    acf_pacf(values_first_difference, 12)
 
 if res == "DS I(2)" or res == "TS + DS":
-    acf_pacf(values_second_difference, T)
+    acf_pacf(values_second_difference, 12)
 
 
 
@@ -580,8 +580,7 @@ def diagnostics(model, p, q):
 
     ar_reverse = 1 / model.arroots
     ax1.scatter(np.real(ar_reverse), np.imag(ar_reverse))
-    circle = plt.Circle((0, 0), 1, fill=False)
-    ax1.add_artist(circle)
+    ax1.add_artist(plt.Circle((0, 0), 1, fill=False))
     ax1.set_title('Обратные корни AR')
     ax1.set_xlim(-1.1, 1.1)
     ax1.set_ylim(-1.1, 1.1)
@@ -590,8 +589,7 @@ def diagnostics(model, p, q):
 
     ma_reverse = 1 / model.maroots
     ax2.scatter(np.real(ma_reverse), np.imag(ma_reverse))
-    circle = plt.Circle((0, 0), 1, fill=False)
-    ax2.add_artist(circle)
+    ax2.add_artist(plt.Circle((0, 0), 1, fill=False))
     ax2.set_title('Обратные корни MA')
     ax2.set_xlim(-1.1, 1.1)
     ax2.set_ylim(-1.1, 1.1)
@@ -611,7 +609,7 @@ def diagnostics(model, p, q):
 
 
     # Коррелограммы
-    acf_pacf(model.resid, T)
+    acf_pacf(model.resid, 12)
 
     if min(acorr_ljungbox(model.resid, lags=min(30, len(current_values) // 5))['lb_pvalue']) < 0.05:
         print(f"{"- Коррелограммы":<38} - не выполнено")
@@ -692,8 +690,8 @@ best      = [0, 0]
 
 for i in range(p, 0, -1):
     for j in range(q, 0, -1):
-        model = ARIMA(current_values, exog=exog, order=(i, d, j), trend='n').fit()
-        result, score = diagnostics(model, i, j)
+        arima = ARIMA(current_values, exog=exog, order=(i, d, j), trend='n').fit()
+        result, score = diagnostics(arima, i, j)
 
         if result:
             break_all = True
@@ -701,7 +699,7 @@ for i in range(p, 0, -1):
         else:
             if max_score < score:
                 max_score = score
-                best = [i, j]
+                best      = [i, j]
 
     if break_all:
         break
@@ -712,11 +710,160 @@ if not break_all:
     print("Построенные модели не удовлетворяют всем условиям:")
     print(f"- лучшая модель с 'p' = {best[0]} и 'q' = {best[1]} (выполнено условий: {max_score})")
 
-    model = ARIMA(current_values, exog=exog, order=(best[0], d, best[1]), trend='n').fit()
+    arima = ARIMA(current_values, exog=exog, order=(best[0], d, best[1]), trend='n').fit()
 
 
 
 
 
-print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 5 =====")
+print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 5 / Модели условной гетероскедастичности =====")
+
+
+
+print("\n\n\n--- Задание 1 / Идентификация порядков модели ARCH ---")
+
+plot_acf(np.pow(arima.resid, 2), lags=12, zero=False)
+plt.show()
+
+p = int(input("Введите последний значимый лаг 'АКФ' перед первым незначимым: "))
+
+
+
+print("\n\n\n--- Задание 2 / Анализ остатков модели ARIMA на наличие ARCH-эффектов ---")
+
+for i in range(p, 0, -1):
+    _, _, _, f_pvalue = het_arch(arima.resid, i)
+
+    if f_pvalue < 0.05:
+        print(f"- ARCH({i}) модель имеет ARCH-эффекты (p-value(F-statistic) = {f_pvalue})")
+        p = i
+        break
+    else:
+        print(f"- ARCH({i}) модель не имеет ARCH-эффектов (p-value(F-statistic) = {f_pvalue})")
+
+        if i == 1:
+            raise NameError("Остатки модели ARIMA не имеют ARCH-эффектов")
+
+
+
+print("\n\n\n--- Задание 3 / Построение моделей и получение оценок ---")
+
+def arch_garch(residuals, vol, p, q=0, dist='normal', cov_type='classic', output=False):
+    model = arch_model(residuals, vol=vol, p=p, q=q, dist=dist).fit(update_freq=0, cov_type=cov_type)
+
+    if output:
+        print("- R-squared          (коэффициент детерминации):                                            ", model.rsquared)
+        print("- R-squared-adjusted (скорректированный на число степеней свободы коэффициент детерминации):", model.rsquared_adj)
+
+    return model
+
+
+
+ARCH = arch_garch(arima.resid, vol='ARCH', p=p, output=True)
+
+
+
+print("\n\n\n--- Задание 4 / Подбор вида распределения ---")
+
+def jarque_bera_test(residuals):
+    plt.hist(residuals, edgecolor='k')
+    plt.title('Гистограмма остатков')
+    plt.xlabel('Значения')
+    plt.ylabel('Частота')
+    plt.show()
+
+    _, probability = jarque_bera(residuals)
+
+    if probability <= 0.05:
+        print(f"{"- p-value(тест Бера–Жарка)"} - не выполнен ({probability})")
+        return False
+    else:
+        print(f"{"- p-value(тест Бера–Жарка)"} -    выполнен ({probability})")
+        return True
+
+
+
+def selecting_the_type_of_distribution(model, residuals, vol, p, q=0):
+    if jarque_bera_test(model.resid / model.conditional_volatility):
+        return model
+    else:
+        print(f"Перестроим {vol} модель с GED-распределением")
+
+        return arch_garch(residuals, vol=vol, p=p, q=q, dist='t', cov_type='robust')
+
+
+
+def statistical_significance(model, vol):
+    if sum(model.params[2:-1]) < 1 and max(model.pvalues[2:-1]) < 0.05:
+        print(f"Модель {vol} статистически значимая")
+    else:
+        print(f"Модель {vol} статистически не значимая")
+
+
+
+ARCH = selecting_the_type_of_distribution(ARCH, arima.resid, vol='ARCH', p=p)
+
+statistical_significance(ARCH, vol='ARCH')
+
+
+
+print("\n\n\n--- Задание 5 / Анализ качества построенных моделей ---")
+
+def quality_analysis(residuals, vol, p):
+    # Коррелограммы
+    acf_pacf(residuals, lags=12)
+
+    # ARCH LM тест
+    _, _, _, f_pvalue = het_arch(residuals, p)
+
+    if f_pvalue > 0.05:
+        print(f"{vol} модель не имеет ARCH-эффектов (p-value(F-statistic) = {f_pvalue})")
+    else:
+        print(f"{vol} модель имеет ARCH-эффекты (p-value(F-statistic) = {f_pvalue})")
+
+
+
+quality_analysis(ARCH.resid / ARCH.conditional_volatility, vol='ARCH', p=p)
+
+
+
+print("\n\n\n--- Задание 6 / Построение и анализ GARCH модели ---")
+
+GARCH = arch_garch(ARCH.resid, vol='GARCH', p=1, q=1, output=True)
+
+GARCH = selecting_the_type_of_distribution(GARCH, ARCH.resid, vol='GARCH', p=1, q=1)
+
+statistical_significance(GARCH, vol='GARCH')
+
+quality_analysis(GARCH.resid / GARCH.conditional_volatility, vol='GARCH', p=p)
+
+
+
+print("\n\n\n--- Задание 7 / Селекция ARCH и GARCH моделей ---")
+
+def selection(ARCH, GARCH):
+    print(f"- ARCH:  AIC = {ARCH.aic} / - BIC = {ARCH.bic}")
+    print(f"- GARCH: BIC = {GARCH.aic} / - BIC = {GARCH.bic}")
+
+    if ARCH.aic < GARCH.aic:
+        print("Выбрана модель ARCH")
+        return ARCH
+    else:
+        print("Выбрана модель GARCH")
+        return GARCH
+
+ARCH_GARCH = selection(ARCH, GARCH)
+
+
+
+
+
 print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 6 =====")
+
+print("\n\n\n--- Задание 1 / Прогноз на основе модели ARIMA ---")
+
+
+
+print("\n\n\n--- Задание 2 / Прогноз на основе модели ARCH/GARCH ---")
+print("\n\n\n--- Задание 3 / Сравнение моделей ---")
+print("\n\n\n--- Задание 4 / Вывод ---")
