@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from arch                          import arch_model
 from scipy                         import stats
 from scipy.stats                   import jarque_bera
+from sklearn.metrics               import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
 from statsmodels.tsa.seasonal      import STL
 from statsmodels.tsa.stattools     import adfuller
 from statsmodels.tsa.arima.model   import ARIMA
@@ -315,7 +316,7 @@ if res == "TS + DS" or res == "TS":
 
 
 
-    print("\n\n\n--- Задание 3 / Удаление детерминированного тренда ---")
+    print("\n\n\n--- Задание 4 / Удаление детерминированного тренда ---")
 
     degrees = [t, np.pow(t, 2), np.pow(t, 3)]
 
@@ -327,7 +328,7 @@ if res == "TS + DS" or res == "TS":
 
 
 
-    print("\n\n\n--- Задание 4 / Определение вида детерминированных компонент ---")
+    print("\n\n\n--- Задание 5 / Определение вида детерминированных компонент ---")
 
     result = []
 
@@ -372,7 +373,7 @@ acf_pacf(current_values)
 
 
 
-print("\n\n\n--- Задание 5 / Выделение сезонности ---")
+print("\n\n\n--- Задание 3 / Выделение сезонности ---")
 
 def plot(values, residuals):
     plt.plot(time[:len(values)], values,                         "k", label="Исходный", linewidth=0.5)
@@ -611,7 +612,7 @@ def diagnostics(model, p, q):
     # Коррелограммы
     acf_pacf(model.resid, 12)
 
-    if min(acorr_ljungbox(model.resid, lags=min(30, len(current_values) // 5))['lb_pvalue']) < 0.05:
+    if min(acorr_ljungbox(model.resid, lags=min(30, len(values) // 5))['lb_pvalue']) < 0.05:
         print(f"{"- Коррелограммы":<38} - не выполнено")
         result = False
     else:
@@ -631,7 +632,7 @@ def diagnostics(model, p, q):
 
 
     # R-squared
-    R_squared = 1 - np.sum(np.pow(current_values - model.fittedvalues, 2))/np.sum(np.pow(current_values - np.mean(current_values), 2))
+    R_squared = 1 - np.sum(np.pow(values - model.fittedvalues, 2))/np.sum(np.pow(values - np.mean(values), 2))
 
     if R_squared < 0.5:
         print(f"{"- R-squared (коэффициент детерминации)":<38} - не выполнено ({R_squared})")
@@ -645,8 +646,8 @@ def diagnostics(model, p, q):
     # F-statistic
     k = p + q
 
-    F_statistic = (R_squared / k) / ((1 - R_squared) / (len(current_values) - k - 1))
-    f_pvalue    = 1 - stats.f.cdf(F_statistic, k, len(current_values) - k - 1)
+    F_statistic = (R_squared / k) / ((1 - R_squared) / (len(values) - k - 1))
+    f_pvalue    = 1 - stats.f.cdf(F_statistic, k, len(values) - k - 1)
 
     if f_pvalue >= 0.05:
         print(f"{"- p-value(F-statistic)":<38} - не выполнено ({f_pvalue})")
@@ -658,7 +659,7 @@ def diagnostics(model, p, q):
 
 
     # Тест Бера–Жарка
-    plt.hist(model.resid, bins=min(50, len(current_values) // 10), edgecolor='k')
+    plt.hist(model.resid, bins=min(50, len(values) // 10), edgecolor='k')
     plt.title('Гистограмма остатков')
     plt.xlabel('Значения')
     plt.ylabel('Частота')
@@ -693,13 +694,13 @@ for i in range(p, 0, -1):
         arima = ARIMA(current_values, exog=exog, order=(i, d, j), trend='n').fit()
         result, score = diagnostics(arima, i, j)
 
+        if max_score < score:
+            max_score = score
+            best      = [i, j]
+
         if result:
             break_all = True
             break
-        else:
-            if max_score < score:
-                max_score = score
-                best      = [i, j]
 
     if break_all:
         break
@@ -710,7 +711,7 @@ if not break_all:
     print("Построенные модели не удовлетворяют всем условиям:")
     print(f"- лучшая модель с 'p' = {best[0]} и 'q' = {best[1]} (выполнено условий: {max_score})")
 
-    arima = ARIMA(current_values, exog=exog, order=(best[0], d, best[1]), trend='n').fit()
+    arima = ARIMA(values, exog=exog, order=(best[0], d, best[1]), trend='n').fit()
 
 
 
@@ -735,11 +736,11 @@ for i in range(p, 0, -1):
     _, _, _, f_pvalue = het_arch(arima.resid, i)
 
     if f_pvalue < 0.05:
-        print(f"- ARCH({i}) модель имеет ARCH-эффекты (p-value(F-statistic) = {f_pvalue})")
+        print(f"- Модель ARCH({i}) имеет ARCH-эффекты (p-value(F-statistic) = {f_pvalue})")
         p = i
         break
     else:
-        print(f"- ARCH({i}) модель не имеет ARCH-эффектов (p-value(F-statistic) = {f_pvalue})")
+        print(f"- Модель ARCH({i}) не имеет ARCH-эффектов (p-value(F-statistic) = {f_pvalue})")
 
         if i == 1:
             raise NameError("Остатки модели ARIMA не имеют ARCH-эффектов")
@@ -748,8 +749,8 @@ for i in range(p, 0, -1):
 
 print("\n\n\n--- Задание 3 / Построение моделей и получение оценок ---")
 
-def arch_garch(residuals, vol, p, q=0, dist='normal', cov_type='classic', output=False):
-    model = arch_model(residuals, vol=vol, p=p, q=q, dist=dist).fit(update_freq=0, cov_type=cov_type)
+def arch_garch(values, vol, p, q=0, dist='normal', cov_type='classic', output=False):
+    model = arch_model(values, vol=vol, p=p, q=q, dist=dist).fit(update_freq=0, cov_type=cov_type)
 
     if output:
         print("- R-squared          (коэффициент детерминации):                                            ", model.rsquared)
@@ -787,7 +788,7 @@ def selecting_the_type_of_distribution(model, residuals, vol, p, q=0):
     if jarque_bera_test(model.resid / model.conditional_volatility):
         return model
     else:
-        print(f"Перестроим {vol} модель с GED-распределением")
+        print(f"Перестроим модель {vol} с T-распределением")
 
         return arch_garch(residuals, vol=vol, p=p, q=q, dist='t', cov_type='robust')
 
@@ -795,9 +796,9 @@ def selecting_the_type_of_distribution(model, residuals, vol, p, q=0):
 
 def statistical_significance(model, vol):
     if sum(model.params[2:-1]) < 1 and max(model.pvalues[2:-1]) < 0.05:
-        print(f"Модель {vol} статистически значимая")
+        print(f"- Модель {vol} статистически значимая")
     else:
-        print(f"Модель {vol} статистически не значимая")
+        print(f"- Модель {vol} статистически не значимая")
 
 
 
@@ -817,9 +818,9 @@ def quality_analysis(residuals, vol, p):
     _, _, _, f_pvalue = het_arch(residuals, p)
 
     if f_pvalue > 0.05:
-        print(f"{vol} модель не имеет ARCH-эффектов (p-value(F-statistic) = {f_pvalue})")
+        print(f"- Модель {vol} не имеет ARCH-эффектов (p-value(F-statistic) = {f_pvalue})")
     else:
-        print(f"{vol} модель имеет ARCH-эффекты (p-value(F-statistic) = {f_pvalue})")
+        print(f"- Модель {vol} имеет ARCH-эффекты (p-value(F-statistic) = {f_pvalue})")
 
 
 
@@ -829,13 +830,13 @@ quality_analysis(ARCH.resid / ARCH.conditional_volatility, vol='ARCH', p=p)
 
 print("\n\n\n--- Задание 6 / Построение и анализ GARCH модели ---")
 
-GARCH = arch_garch(ARCH.resid, vol='GARCH', p=1, q=1, output=True)
+GARCH = arch_garch(arima.resid, vol='GARCH', p=1, q=1, output=True)
 
-GARCH = selecting_the_type_of_distribution(GARCH, ARCH.resid, vol='GARCH', p=1, q=1)
+GARCH = selecting_the_type_of_distribution(GARCH, arima.resid, vol='GARCH', p=1, q=1)
 
 statistical_significance(GARCH, vol='GARCH')
 
-quality_analysis(GARCH.resid / GARCH.conditional_volatility, vol='GARCH', p=p)
+quality_analysis(GARCH.resid / GARCH.conditional_volatility, vol='GARCH', p=1)
 
 
 
@@ -847,9 +848,11 @@ def selection(ARCH, GARCH):
 
     if ARCH.aic < GARCH.aic:
         print("Выбрана модель ARCH")
+        return "ARCH"
         return ARCH
     else:
         print("Выбрана модель GARCH")
+        return "GARCH"
         return GARCH
 
 ARCH_GARCH = selection(ARCH, GARCH)
@@ -858,12 +861,147 @@ ARCH_GARCH = selection(ARCH, GARCH)
 
 
 
-print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 6 =====")
+print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 6 / Построение прогноза =====")
+
+
 
 print("\n\n\n--- Задание 1 / Прогноз на основе модели ARIMA ---")
+
+steps = len(values) // 10
+
+
+
+# Динамический прогноз
+arima_dynamic = arima.forecast(steps=steps)
+
+plt.title("Динамический прогноз ARIMA", fontweight='bold')
+plt.plot(arima_dynamic)
+plt.show()
+
+
+
+# Статистический прогноз
+train = values[:-steps]
+test  = values[-steps:]
+
+arima_statistical = []
+
+for i in range(steps, 0, -1):
+    model = ARIMA(train, exog=exog, order=(best[0], d, best[1]), trend='n').fit()
+    arima_statistical += model.forecast(steps=1).tolist()
+
+    train.append(values[-i])
+
+
+
+plt.plot(time[-steps:], arima_statistical, "r", label="Прогноз")
+plt.plot(time[-steps:], test,              "b", label="Исходные данные")
+plt.title(f"Статистический прогноз ARIMA", fontweight='bold')
+plt.legend()
+plt.show()
+
 
 
 
 print("\n\n\n--- Задание 2 / Прогноз на основе модели ARCH/GARCH ---")
+
+def restoration_of_differences(values_with_difference, step=1):
+    if d == 0:
+        return values_with_difference
+
+    elif d == 1:
+        values_without_difference = [values[-step] + values_with_difference[0]]
+        for i in range(1, len(values_with_difference)):
+            values_without_difference.append(values_without_difference[-1] + values_with_difference[i])
+
+        return values_without_difference
+
+    else:
+        intermediate = [values[-step] - values[-step - 1] + values_with_difference[0]]
+        for i in range(1, len(values_with_difference)):
+            intermediate.append(intermediate[-1] + values_with_difference[i])
+
+        values_without_difference = [values[-step] + intermediate[0]]
+        for i in range(1, len(intermediate)):
+            values_without_difference.append(values_without_difference[-1] + intermediate[i])
+
+        return values_without_difference
+
+
+
+def arch_garch_forecast(values, vol):
+    if vol == 'ARCH':
+        return arch_model(values, mean='AR', lags=best[0], vol='ARCH', p=p).fit(update_freq=0)
+    else:
+        return arch_model(values, mean='AR', lags=best[0], vol='GARCH', p=1, q=1).fit(update_freq=0)
+
+
+
+# Динамический прогноз
+ARCH_GARCH_dynamic = restoration_of_differences(arch_garch_forecast(current_values, ARCH_GARCH).forecast(horizon=steps).mean.iloc[-1].tolist())
+
+plt.title(f"Динамический прогноз {ARCH_GARCH}", fontweight='bold')
+plt.plot(ARCH_GARCH_dynamic)
+plt.show()
+
+
+
+# Статистический прогноз
+train = current_values[:-steps]
+test  = values[-steps:]
+
+ARCH_GARCH_statistical = []
+
+for i in range(steps, 0, -1):
+    model = arch_garch_forecast(train, ARCH_GARCH)
+    ARCH_GARCH_statistical += restoration_of_differences(model.forecast(horizon=1).mean.iloc[-1].tolist(), i + 1)
+
+    train = np.append(train, current_values[-i])
+
+
+
+plt.plot(time[-steps:], ARCH_GARCH_statistical, "r", label="Прогноз")
+plt.plot(time[-steps:], test,                   "b", label="Исходные данные")
+plt.title(f"Статистический прогноз {ARCH_GARCH}", fontweight='bold')
+plt.legend()
+plt.show()
+
+
+
 print("\n\n\n--- Задание 3 / Сравнение моделей ---")
+
+RMSE_arima = np.sqrt(mean_squared_error(test, arima_statistical))
+MAE_arima  = mean_absolute_error(test, arima_statistical)
+MAPE_arima = mean_absolute_percentage_error(test, arima_statistical)
+
+RMSE_ARCH_GARCH = np.sqrt(mean_squared_error(test, ARCH_GARCH_statistical))
+MAE_ARCH_GARCH  = mean_absolute_error(test, ARCH_GARCH_statistical)
+MAPE_ARCH_GARCH = mean_absolute_percentage_error(test, ARCH_GARCH_statistical)
+
+print(f"{"Сравнение":<20} | {"RMSE":<20} | {"MAE":<20} | {"MAPE":<20}")
+print(f"{"- модель ARIMA":<20} | {RMSE_arima:>20} | {MAE_arima:>20} | {MAPE_arima:>20}")
+print(f"{f"- модель {ARCH_GARCH}":<20} | {RMSE_ARCH_GARCH:>20} | {MAE_ARCH_GARCH:>20} | {MAPE_ARCH_GARCH:>20}")
+
+
+
+print("")
+if RMSE_arima < RMSE_ARCH_GARCH:
+    print("- модель ARIMA - лучшая")
+elif RMSE_arima > RMSE_ARCH_GARCH:
+    print(f"- модель {ARCH_GARCH} - лучшая")
+elif MAE_arima < MAE_ARCH_GARCH:
+    print("- модель ARIMA - лучшая")
+elif MAE_arima > MAE_ARCH_GARCH:
+    print(f"- модель {ARCH_GARCH} - лучшая")
+elif MAPE_arima < MAPE_ARCH_GARCH:
+    print("- модель ARIMA - лучшая")
+elif MAPE_arima > MAPE_ARCH_GARCH:
+    print(f"- модель {ARCH_GARCH} - лучшая")
+else:
+    print("- обе модели - лучшие")
+
+
+
 print("\n\n\n--- Задание 4 / Вывод ---")
+
+print("- Лабораторные работы 1-6 выполнены\n\n\n")
