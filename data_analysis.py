@@ -4,6 +4,7 @@ import pandas            as pd
 import statsmodels.api   as sm
 import matplotlib.pyplot as plt
 from arch                          import arch_model
+from matplotlib.rcsetup import validate_int
 from scipy                         import stats
 from scipy.stats                   import jarque_bera
 from sklearn.metrics               import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
@@ -55,7 +56,7 @@ def original_schedule():
     plt.ylabel("Температура")
     plt.show()
 
-original_schedule()
+# original_schedule()
 
 
 
@@ -80,11 +81,11 @@ values_third_difference  = np.diff(values, 3)
 
 
 print("АКФ и ЧАКФ исходного ряда")
-acf_pacf(values,                   12)
+# acf_pacf(values,                   12)
 print("АКФ и ЧАКФ первых разностей")
-acf_pacf(values_first_difference,  12)
+# acf_pacf(values_first_difference,  12)
 print("АКФ и ЧАКФ вторых разностей")
-acf_pacf(values_second_difference, 12)
+# acf_pacf(values_second_difference, 12)
 
 
 
@@ -302,7 +303,7 @@ print("\n\n\n\n\n===== ЛАБОРАТОРНАЯ РАБОТА 3 / Выделен�
 
 print("\n\n\n--- Задание 1 / Анализ графика исходного ряда ---")
 
-original_schedule()
+# original_schedule()
 
 
 
@@ -391,7 +392,7 @@ def plot(values, residuals):
 T = int(input("Введите период сезонности: "))
 
 residuals = []
-methods   = ["Первый способ", "Второй способ", "Третий способ"]
+methods   = ["Первый способ   ", "Второй способ   ", "Третий способ   ", "Четвертый способ"]
 
 
 
@@ -473,20 +474,22 @@ third_method(current_values)
 def fourth_method(values):
     model = STL(pd.Series(values), period=T, robust=True).fit()
 
+    residuals.append(model.resid)
+
     print("\nЧетвертый способ:")
     acf_pacf(model.resid)
     plot(values, model.resid)
 
 
 
-# fourth_method(current_values)
+fourth_method(current_values)
 
 
 
 # Сравнение и выбор лучшего метода оценки сезонной компоненты
 print("\nСравнение методов:")
 
-if len(residuals) == 3:
+if len(residuals) == 4:
     plt.plot(time[:len(residuals[0])], residuals[0], "k", label=methods[0], linewidth=0.5)
     plt.plot(time[:len(residuals[0])], residuals[1], "b", label=methods[1], linewidth=0.5)
     plt.plot(time[:len(residuals[0])], residuals[2], "r", label=methods[2], linewidth=0.5)
@@ -500,7 +503,7 @@ if len(residuals) == 3:
         print(f"- {methods[i]}: среднее значение - {np.mean(residuals[i]):>25} / стандартное отклонение - {std[i]}")
 
     best_seasonality = std.index(min(std))
-    print(f"\n{methods[best_seasonality]} - лучший")
+    print(f"\nЛучший: {methods[best_seasonality]}")
 
 
 
@@ -666,7 +669,7 @@ def diagnostics(model, p, q):
 
 break_all = False
 max_score = 0
-best      = [1, 3]
+order     = [1, 0, 3]
 
 # for i in range(p, 0, -1):
 #     for j in range(q, 0, -1):
@@ -675,7 +678,7 @@ best      = [1, 3]
 #
 #         if max_score < score:
 #             max_score = score
-#             best      = [i, j]
+#             order     = [i, 0, j]
 #
 #         if result:
 #             break_all = True
@@ -688,9 +691,9 @@ best      = [1, 3]
 
 if not break_all:
     print("Построенные модели не удовлетворяют всем условиям:")
-    print(f"- лучшая модель с 'p' = {best[0]} и 'q' = {best[1]} (выполнено условий: {max_score})")
+    print(f"- лучшая модель с 'p' = {order[0]} и 'q' = {order[2]} (выполнено условий: {max_score})")
 
-    arima = ARIMA(values, exog=exog, order=(best[0], 0, best[1]), trend='n').fit()
+    arima = ARIMA(current_values, exog=exog, order=order, trend='n').fit()
 
 
 
@@ -828,11 +831,9 @@ def selection(ARCH, GARCH):
     if ARCH.aic < GARCH.aic:
         print("Выбрана модель ARCH")
         return "ARCH"
-        return ARCH
     else:
         print("Выбрана модель GARCH")
         return "GARCH"
-        return GARCH
 
 ARCH_GARCH = selection(ARCH, GARCH)
 
@@ -848,83 +849,70 @@ print("\n\n\n--- Задание 1 / Прогноз на основе модел�
 
 steps = len(values) // 10
 
+train = current_values[:-steps]
+test  = values[-steps:]
+
 
 
 # Динамический прогноз
-arima_dynamic = arima.forecast(steps=steps) + values[:steps] - residuals[best_seasonality][:steps]
+arima = ARIMA(train, exog=exog, order=order, trend='n').fit()
+
+arima_forecast = arima.forecast(steps=steps)
+arima_dynamic  = arima_forecast + values[-steps:] - residuals[best_seasonality][-steps:]
 
 plt.title("Динамический прогноз ARIMA", fontweight='bold')
-plt.plot(arima_dynamic)
-plt.plot(values[:steps])
-plt.show()
-
-
-
-# Статистический прогноз
-train = values[:-steps]
-test  = values[-steps:]
-
-arima_statistical = []
-
-for i in range(steps, 0, -1):
-    model = ARIMA(train, exog=exog, order=(best[0], 0, best[1]), trend='n').fit()
-    arima_statistical += model.forecast(steps=1).tolist()
-
-    train.append(values[-i])
-
-
-
-plt.plot(time[-steps:], arima_statistical, "r", label="Прогноз")
-plt.plot(time[-steps:], test,              "b", label="Исходные данные")
-plt.title(f"Статистический прогноз ARIMA", fontweight='bold')
+plt.plot(arima_dynamic,  "r", label="Прогноз")
+plt.plot(test,           "b", label="Исходный ряд")
 plt.legend()
 plt.show()
 
 
 
-exit()
+# Статистический прогноз
+# arima_statistical = []
+#
+# for step in range(steps, 0, -1):
+#     model = ARIMA(train, exog=exog, order=order, trend='n').fit()
+#
+#     arima_forecast = model.forecast(steps=1)
+#     arima_statistical.append(arima_forecast + values[-step] - residuals[best_seasonality][-step])
+#
+#     np.array(train, current_values[-step])
+#
+#
+#
+# plt.title(f"Статистический прогноз ARIMA", fontweight='bold')
+# plt.plot(time[-steps:], arima_statistical, "r", label="Прогноз")
+# plt.plot(time[-steps:], test,              "b", label="Исходный ряд")
+# plt.legend()
+# plt.show()
+
+
+
 print("\n\n\n--- Задание 2 / Прогноз на основе модели ARCH/GARCH ---")
-
-def restoration_of_differences(values_with_difference, step=1):
-    if d == 0:
-        return values_with_difference
-
-    elif d == 1:
-        values_without_difference = [values[-step] + values_with_difference[0]]
-        for i in range(1, len(values_with_difference)):
-            values_without_difference.append(values_without_difference[-1] + values_with_difference[i])
-
-        return values_without_difference
-
-    else:
-        intermediate = [values[-step] - values[-step - 1] + values_with_difference[0]]
-        for i in range(1, len(values_with_difference)):
-            intermediate.append(intermediate[-1] + values_with_difference[i])
-
-        values_without_difference = [values[-step] + intermediate[0]]
-        for i in range(1, len(intermediate)):
-            values_without_difference.append(values_without_difference[-1] + intermediate[i])
-
-        return values_without_difference
-
-
 
 def arch_garch_forecast(values, vol):
     if vol == 'ARCH':
-        return arch_model(values, mean='AR', lags=best[0], vol='ARCH', p=p).fit(update_freq=0)
+        return arch_model(values, mean='AR', lags=order[0], vol='ARCH', p=p).fit(update_freq=0)
     else:
-        return arch_model(values, mean='AR', lags=best[0], vol='GARCH', p=1, q=1).fit(update_freq=0)
+        return arch_model(values, mean='AR', lags=order[0], vol='GARCH', p=1, q=1).fit(update_freq=0)
+
+
+
+train = arima.resid[:-steps]
+test  = arima.resid[-steps:]
 
 
 
 # Динамический прогноз
-ARCH_GARCH_dynamic = restoration_of_differences(arch_garch_forecast(current_values, ARCH_GARCH).forecast(horizon=steps).mean.iloc[-1].tolist())
+ARCH_GARCH_dynamic = arch_garch_forecast(train, ARCH_GARCH).forecast(horizon=steps).variance.iloc[-1].tolist()
 
 plt.title(f"Динамический прогноз {ARCH_GARCH}", fontweight='bold')
-plt.plot(ARCH_GARCH_dynamic)
+plt.plot(ARCH_GARCH_dynamic, "r", label="Прогноз")
+plt.plot(test,               "b", label="Исходный ряд")
 plt.show()
 
-
+exit()
 
 # Статистический прогноз
 train = current_values[:-steps]
@@ -950,35 +938,22 @@ plt.show()
 
 print("\n\n\n--- Задание 3 / Сравнение моделей ---")
 
-RMSE_arima = np.sqrt(mean_squared_error(test, arima_statistical))
-MAE_arima  = mean_absolute_error(test, arima_statistical)
-MAPE_arima = mean_absolute_percentage_error(test, arima_statistical)
+RMSE_arima_dynamic = np.sqrt(mean_squared_error(test, arima_dynamic))
+MAE_arima_dynamic  = mean_absolute_error(test, arima_dynamic)
+MAPE_arima_dynamic = mean_absolute_percentage_error(test, arima_dynamic)
+
+RMSE_arima_statistical = np.sqrt(mean_squared_error(test, arima_statistical))
+MAE_arima_statistical  = mean_absolute_error(test, arima_statistical)
+MAPE_arima_statistical = mean_absolute_percentage_error(test, arima_statistical)
 
 RMSE_ARCH_GARCH = np.sqrt(mean_squared_error(test, ARCH_GARCH_statistical))
 MAE_ARCH_GARCH  = mean_absolute_error(test, ARCH_GARCH_statistical)
 MAPE_ARCH_GARCH = mean_absolute_percentage_error(test, ARCH_GARCH_statistical)
 
-print(f"{"Сравнение":<20} | {"RMSE":<20} | {"MAE":<20} | {"MAPE":<20}")
-print(f"{"- модель ARIMA":<20} | {RMSE_arima:>20} | {MAE_arima:>20} | {MAPE_arima:>20}")
-print(f"{f"- модель {ARCH_GARCH}":<20} | {RMSE_ARCH_GARCH:>20} | {MAE_ARCH_GARCH:>20} | {MAPE_ARCH_GARCH:>20}")
-
-
-
-print("")
-if RMSE_arima < RMSE_ARCH_GARCH:
-    print("- модель ARIMA - лучшая")
-elif RMSE_arima > RMSE_ARCH_GARCH:
-    print(f"- модель {ARCH_GARCH} - лучшая")
-elif MAE_arima < MAE_ARCH_GARCH:
-    print("- модель ARIMA - лучшая")
-elif MAE_arima > MAE_ARCH_GARCH:
-    print(f"- модель {ARCH_GARCH} - лучшая")
-elif MAPE_arima < MAPE_ARCH_GARCH:
-    print("- модель ARIMA - лучшая")
-elif MAPE_arima > MAPE_ARCH_GARCH:
-    print(f"- модель {ARCH_GARCH} - лучшая")
-else:
-    print("- обе модели - лучшие")
+print(f"{"Сравнение":<30} | {"RMSE":<20} | {"MAE":<20} | {"MAPE":<20}")
+print(f"{"- динамическая модель ARIMA":<30} | {RMSE_arima_dynamic:>20} | {MAE_arima_dynamic:>20} | {MAPE_arima_dynamic:>20}")
+print(f"{"- статистическая ARIMA":<30} | {RMSE_arima_statistical:>20} | {MAE_arima_statistical:>20} | {MAPE_arima_statistical:>20}")
+print(f"{f"- модель {ARCH_GARCH}":<30} | {RMSE_ARCH_GARCH:>20} | {MAE_ARCH_GARCH:>20} | {MAPE_ARCH_GARCH:>20}")
 
 
 
