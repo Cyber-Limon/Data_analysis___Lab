@@ -4,7 +4,6 @@ import pandas            as pd
 import statsmodels.api   as sm
 import matplotlib.pyplot as plt
 from arch                          import arch_model
-from matplotlib.rcsetup import validate_int
 from scipy                         import stats
 from scipy.stats                   import jarque_bera
 from sklearn.metrics               import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
@@ -27,7 +26,7 @@ values = []
 with open('weather.csv', mode='r', encoding='utf-8') as file:
     dict_reader = csv.DictReader(file)
     for row in dict_reader:
-        r = row["# Метеостанция Стерлитамак"]
+        r = row["# Метеостанция Дема"]
 
         if "14:00" in r:
             time.append(r[0:10])
@@ -63,6 +62,8 @@ def original_schedule():
 print("\n\n\n--- Задание 2 / Анализ коррелограмм ---")
 
 def acf_pacf(values, lags=None):
+    return None
+
     if lags is None:
         lags = len(values) // 2
 
@@ -855,37 +856,37 @@ test  = values[-steps:]
 
 
 # Динамический прогноз
-arima = ARIMA(train, exog=exog, order=order, trend='n').fit()
+model = ARIMA(train, exog=exog, order=order, trend='n').fit()
 
-arima_forecast = arima.forecast(steps=steps)
-arima_dynamic  = arima_forecast + values[-steps:] - residuals[best_seasonality][-steps:]
+arima_forecast = model.forecast(steps=steps)
+arima_dynamic  = arima_forecast + test - residuals[best_seasonality][-steps:]
 
 plt.title("Динамический прогноз ARIMA", fontweight='bold')
-plt.plot(arima_dynamic,  "r", label="Прогноз")
-plt.plot(test,           "b", label="Исходный ряд")
+plt.plot(time[-steps:], arima_dynamic,  "r", label="Прогноз")
+plt.plot(time[-steps:], test,           "b", label="Исходный ряд")
 plt.legend()
 plt.show()
 
 
 
 # Статистический прогноз
-# arima_statistical = []
-#
-# for step in range(steps, 0, -1):
-#     model = ARIMA(train, exog=exog, order=order, trend='n').fit()
-#
-#     arima_forecast = model.forecast(steps=1)
-#     arima_statistical.append(arima_forecast + values[-step] - residuals[best_seasonality][-step])
-#
-#     np.array(train, current_values[-step])
-#
-#
-#
-# plt.title(f"Статистический прогноз ARIMA", fontweight='bold')
-# plt.plot(time[-steps:], arima_statistical, "r", label="Прогноз")
-# plt.plot(time[-steps:], test,              "b", label="Исходный ряд")
-# plt.legend()
-# plt.show()
+arima_statistical = []
+
+for step in range(steps, 0, -1):
+    model = ARIMA(train, exog=exog, order=order, trend='n').fit()
+
+    arima_forecast = model.forecast(steps=1)
+    arima_statistical.append(arima_forecast + values[-step] - residuals[best_seasonality][-step])
+
+    np.array(train, current_values[-step])
+
+
+
+plt.title(f"Статистический прогноз ARIMA", fontweight='bold')
+plt.plot(time[-steps:], arima_statistical, "r", label="Прогноз")
+plt.plot(time[-steps:], test,              "b", label="Исходный ряд")
+plt.legend()
+plt.show()
 
 
 
@@ -900,37 +901,36 @@ def arch_garch_forecast(values, vol):
 
 
 train = arima.resid[:-steps]
-test  = arima.resid[-steps:]
+test  = values[-steps:]
 
 
 
 # Динамический прогноз
-ARCH_GARCH_dynamic = arch_garch_forecast(train, ARCH_GARCH).forecast(horizon=steps).variance.iloc[-1].tolist()
+ARCH_GARCH_forecast = arch_garch_forecast(train, ARCH_GARCH).forecast(horizon=steps).mean.iloc[-1].tolist()
+ARCH_GARCH_dynamic  = np.array(ARCH_GARCH_forecast) + test - residuals[best_seasonality][-steps:]
 
 plt.title(f"Динамический прогноз {ARCH_GARCH}", fontweight='bold')
-plt.plot(ARCH_GARCH_dynamic, "r", label="Прогноз")
-plt.plot(test,               "b", label="Исходный ряд")
+plt.plot(time[-steps:], ARCH_GARCH_dynamic, "r", label="Прогноз")
+plt.plot(time[-steps:], test,               "b", label="Исходный ряд")
+plt.legend()
 plt.show()
 
-exit()
+
 
 # Статистический прогноз
-train = current_values[:-steps]
-test  = values[-steps:]
-
 ARCH_GARCH_statistical = []
 
-for i in range(steps, 0, -1):
-    model = arch_garch_forecast(train, ARCH_GARCH)
-    ARCH_GARCH_statistical += restoration_of_differences(model.forecast(horizon=1).mean.iloc[-1].tolist(), i + 1)
+for step in range(steps, 0, -1):
+    ARCH_GARCH_forecast = arch_garch_forecast(train, ARCH_GARCH).forecast(horizon=steps).mean.iloc[-1].tolist()
+    ARCH_GARCH_dynamic.append(np.array(ARCH_GARCH_forecast) + values[-step] - residuals[best_seasonality][-steps])
 
-    train = np.append(train, current_values[-i])
+    np.array(train, current_values[-step])
 
 
 
-plt.plot(time[-steps:], ARCH_GARCH_statistical, "r", label="Прогноз")
-plt.plot(time[-steps:], test,                   "b", label="Исходные данные")
-plt.title(f"Статистический прогноз {ARCH_GARCH}", fontweight='bold')
+plt.title(f"Статистический прогноз ARIMA", fontweight='bold')
+plt.plot(time[-steps:], arima_statistical, "r", label="Прогноз")
+plt.plot(time[-steps:], test,              "b", label="Исходный ряд")
 plt.legend()
 plt.show()
 
@@ -946,14 +946,19 @@ RMSE_arima_statistical = np.sqrt(mean_squared_error(test, arima_statistical))
 MAE_arima_statistical  = mean_absolute_error(test, arima_statistical)
 MAPE_arima_statistical = mean_absolute_percentage_error(test, arima_statistical)
 
-RMSE_ARCH_GARCH = np.sqrt(mean_squared_error(test, ARCH_GARCH_statistical))
-MAE_ARCH_GARCH  = mean_absolute_error(test, ARCH_GARCH_statistical)
-MAPE_ARCH_GARCH = mean_absolute_percentage_error(test, ARCH_GARCH_statistical)
+RMSE_ARCH_GARCH_dynamic = np.sqrt(mean_squared_error(test, ARCH_GARCH_dynamic))
+MAE_ARCH_GARCH_dynamic  = mean_absolute_error(test, ARCH_GARCH_dynamic)
+MAPE_ARCH_GARCH_dynamic = mean_absolute_percentage_error(test, ARCH_GARCH_dynamic)
+
+RMSE_ARCH_GARCH_statistical = np.sqrt(mean_squared_error(test, ARCH_GARCH_statistical))
+MAE_ARCH_GARCH_statistical  = mean_absolute_error(test, ARCH_GARCH_statistical)
+MAPE_ARCH_GARCH_statistical = mean_absolute_percentage_error(test, ARCH_GARCH_statistical)
 
 print(f"{"Сравнение":<30} | {"RMSE":<20} | {"MAE":<20} | {"MAPE":<20}")
 print(f"{"- динамическая модель ARIMA":<30} | {RMSE_arima_dynamic:>20} | {MAE_arima_dynamic:>20} | {MAPE_arima_dynamic:>20}")
 print(f"{"- статистическая ARIMA":<30} | {RMSE_arima_statistical:>20} | {MAE_arima_statistical:>20} | {MAPE_arima_statistical:>20}")
-print(f"{f"- модель {ARCH_GARCH}":<30} | {RMSE_ARCH_GARCH:>20} | {MAE_ARCH_GARCH:>20} | {MAPE_ARCH_GARCH:>20}")
+print(f"{f"- динамическая модель {ARCH_GARCH}":<30} | {RMSE_ARCH_GARCH_dynamic:>20} | {MAE_ARCH_GARCH_dynamic:>20} | {MAPE_ARCH_GARCH_dynamic:>20}")
+print(f"{f"- статистическая модель {ARCH_GARCH}":<30} | {RMSE_ARCH_GARCH_statistical:>20} | {MAE_ARCH_GARCH_statistical:>20} | {MAPE_ARCH_GARCH_statistical:>20}")
 
 
 
